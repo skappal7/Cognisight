@@ -621,17 +621,17 @@ def sidebar_config():
     if uploaded_files:
         for file in uploaded_files:
             if file.name not in st.session_state.uploaded_files:
-                try:
-                    # Load data using DataManager
-                    df = st.session_state.data_manager.load_file(file)
-                    st.session_state.uploaded_files[file.name] = {
-                        'dataframe': df,
-                        'upload_time': datetime.now(),
-                        'file_size': file.size
-                    }
-                    st.sidebar.success(f"✅ Loaded: {file.name}")
-                except Exception as e:
-                    st.sidebar.error(f"❌ Error loading {file.name}: {str(e)}")
+                with st.sidebar.spinner(f"📊 Generating summaries for {file.name}..."):
+                    try:
+                        df = st.session_state.data_manager.load_file(file)
+                        st.session_state.uploaded_files[file.name] = {
+                            'dataframe': df,
+                            'upload_time': datetime.now(),
+                            'file_size': file.size
+                        }
+                        st.sidebar.success(f"✅ {file.name} - Summaries ready!")
+                    except Exception as e:
+                        st.sidebar.error(f"❌ {file.name}: {str(e)}")
     
     # Display uploaded files
     if st.session_state.uploaded_files:
