@@ -143,42 +143,45 @@ Remember: Your goal is to transform data into insights that drive decisions. Nev
     
     def _prepare_data_context(self) -> str:
         """
-        Prepare concise data context using summaries instead of raw data
-        This is crucial for token efficiency
+        Prepare concise data context using AUTO-GENERATED summaries
+        Uses summaries created during file upload for token efficiency
         """
         context_parts = []
         
         for table_name, df in self.data_manager.tables.items():
-            # Get data profile
-            profile = self.data_manager.get_data_profile(table_name)
+            # Get metadata with auto-generated summary
+            metadata = self.data_manager.file_metadata.get(table_name, {})
+            auto_summary = metadata.get('auto_summary', {})
             
-            # Create concise summary
-            summary = f"""
+            if auto_summary:
+                # Use pre-generated summary (much faster, no recomputation)
+                summary = f"""
+**Table: {table_name}**
+- Shape: {auto_summary.get('row_count', 0):,} rows × {auto_summary.get('column_count', 0)} columns
+- Memory: {auto_summary.get('memory_mb', 0):.2f} MB
+
+**Column Summary (Top 5):**"""
+                
+                # Add top 5 columns with their stats
+                columns_info = auto_summary.get('columns', {})
+                for i, (col, stats) in enumerate(list(columns_info.items())[:5]):
+                    summary += f"\n  {i+1}. {col} ({stats['dtype']})"
+                    if 'mean' in stats:
+                        summary += f" - Mean: {stats['mean']:.2f}, Range: [{stats['min']:.2f}, {stats['max']:.2f}]"
+                    elif 'unique' in stats:
+                        summary += f" - {stats['unique']} unique values"
+                
+                # Add correlations if available
+                if 'correlations' in auto_summary and auto_summary['correlations']:
+                    summary += "\n\n**Key Correlations:**"
+                    for pair, corr in list(auto_summary['correlations'].items())[:3]:
+                        summary += f"\n  - {pair}: {corr:.3f}"
+            else:
+                # Fallback: basic summary only
+                summary = f"""
 **Table: {table_name}**
 - Shape: {df.height:,} rows × {df.width} columns
-- Columns: {', '.join(df.columns)}
-- Data Types: {dict(zip(df.columns, [str(dtype) for dtype in df.dtypes]))}
-"""
-            
-            # Add statistical summary for numeric columns
-            numeric_cols = [col for col, dtype in zip(df.columns, df.dtypes) 
-                          if dtype in [pl.Int64, pl.Int32, pl.Float64, pl.Float32]]
-            
-            if numeric_cols:
-                summary += "\n**Numeric Column Statistics:**\n"
-                for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
-                    stats = profile['columns'][col]
-                    summary += f"  - {col}: min={stats['min']}, max={stats['max']}, mean={stats['mean']:.2f}\n"
-            
-            # Add categorical column info
-            categorical_cols = [col for col, dtype in zip(df.columns, df.dtypes)
-                              if dtype == pl.Utf8]
-            
-            if categorical_cols:
-                summary += "\n**Categorical Columns:**\n"
-                for col in categorical_cols[:5]:  # Limit to first 5 categorical columns
-                    stats = profile['columns'][col]
-                    summary += f"  - {col}: {stats['unique']} unique values\n"
+- Columns: {', '.join(df.columns[:10])}"""
             
             context_parts.append(summary)
         
