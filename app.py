@@ -515,27 +515,9 @@ def init_session_state():
         st.session_state.analysis_results = []
 
 def sidebar_config():
-    """Configure sidebar with navigation and settings"""
+    """Configure sidebar with LLM settings and file upload"""
     
-    # Sidebar Navigation
-    st.sidebar.markdown("### Navigation")
-    
-    nav_items = [
-        ("⚙️", "SETTINGS", "settings"),
-        ("☁️", "UPLOAD DATA", "upload"),
-        ("💰", "USAGE", "usage"),
-        ("🗄️", "CACHE MANAGEMENT", "cache"),
-        ("💾", "SAVE SESSION", "save"),
-        ("⬇️", "DOWNLOAD SESSION", "download")
-    ]
-    
-    for icon, label, key in nav_items:
-        if st.sidebar.button(f"{icon}  {label}", key=f"nav_{key}", use_container_width=True):
-            st.session_state.current_view = key
-    
-    st.sidebar.markdown("---")
-    
-    # LLM Configuration (Settings)
+    # LLM Configuration
     st.sidebar.markdown("### 🤖 LLM Configuration")
     
     # LLM Provider Selection
