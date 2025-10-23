@@ -22,43 +22,203 @@ from core.llm_client import LLMClient
 from utils.cache_manager import CacheManager
 from utils.visualizer import Visualizer
 
+# Branding Configuration
+LOGO_URL = "https://raw.githubusercontent.com/skappal7/TextAnalyser/refs/heads/main/logo.png"
+FOOTER = "Developed with Streamlit with 💗 by CE Team Innovation Lab 2025"
+
 # Page configuration
 st.set_page_config(
-    page_title="AI Data Analyst Agent",
+    page_title="COGNISIGHT",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better UI
+# Custom CSS for better UI with Sutherland branding
 st.markdown("""
 <style>
+    /* Sutherland Brand Colors */
+    :root {
+        --sutherland-navy: #2C3E50;
+        --sutherland-pink: #E91E63;
+        --sutherland-light: #F8F9FA;
+    }
+    
+    /* Logo styling */
+    .logo-container {
+        display: flex;
+        justify-content: center;
+        padding: 1rem 0 0.5rem 0;
+        animation: fadeIn 1s ease-in;
+    }
+    
+    .logo-container img {
+        max-width: 300px;
+        height: auto;
+    }
+    
+    /* Header styling */
     .main-header {
         font-size: 2.5rem;
         font-weight: 700;
-        color: #1f77b4;
+        color: var(--sutherland-navy);
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
+        animation: slideDown 0.8s ease-out;
     }
+    
     .sub-header {
         font-size: 1.2rem;
         color: #666;
         text-align: center;
         margin-bottom: 2rem;
+        animation: fadeIn 1.2s ease-in;
     }
+    
+    /* Button styling with Sutherland colors */
     .stButton>button {
         width: 100%;
+        background-color: var(--sutherland-pink);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
     }
+    
+    .stButton>button:hover {
+        background-color: #C2185B;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: var(--sutherland-light);
+    }
+    
+    /* Metric card styling */
     .metric-card {
-        background-color: #f0f2f6;
+        background: linear-gradient(135deg, var(--sutherland-navy) 0%, #34495E 100%);
+        color: white;
         padding: 1rem;
-        border-radius: 0.5rem;
+        border-radius: 10px;
         margin: 0.5rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        animation: slideIn 0.6s ease-out;
     }
+    
+    /* Chat message styling */
+    .stChatMessage {
+        animation: messageSlide 0.4s ease-out;
+    }
+    
+    /* Loading animation */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    .loading {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    /* Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes messageSlide {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Quick action buttons with gradient */
+    .quick-action-btn {
+        background: linear-gradient(135deg, var(--sutherland-pink) 0%, #D81B60 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.8rem;
+        margin: 0.3rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(233, 30, 99, 0.2);
+    }
+    
+    .quick-action-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
+    }
+    
+    /* Footer styling */
+    .footer {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--sutherland-navy);
+        font-size: 0.9rem;
+        margin-top: 2rem;
+        border-top: 2px solid var(--sutherland-pink);
+        animation: fadeIn 1.5s ease-in;
+    }
+    
+    /* Cache info styling */
     .cache-info {
         font-size: 0.85rem;
         color: #888;
         font-style: italic;
+        text-align: center;
+        padding: 0.5rem;
+    }
+    
+    /* Success/Error message animations */
+    .stSuccess, .stError, .stWarning, .stInfo {
+        animation: slideIn 0.5s ease-out;
+    }
+    
+    /* Dataframe styling */
+    .dataframe {
+        animation: fadeIn 0.8s ease-in;
+    }
+    
+    /* Selectbox with brand colors */
+    .stSelectbox > div > div {
+        border-color: var(--sutherland-pink);
+    }
+    
+    /* Progress bar with brand color */
+    .stProgress > div > div {
+        background-color: var(--sutherland-pink);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -416,6 +576,13 @@ def main():
     """Main application"""
     init_session_state()
     
+    # Display Logo
+    st.markdown(f"""
+        <div class="logo-container">
+            <img src="{LOGO_URL}" alt="Sutherland Logo">
+        </div>
+    """, unsafe_allow_html=True)
+    
     # Header
     st.markdown('<h1 class="main-header">📊 AI Data Analyst Agent</h1>', unsafe_allow_html=True)
     st.markdown(
@@ -485,6 +652,13 @@ def main():
         ),
         unsafe_allow_html=True
     )
+    
+    # Branded Footer
+    st.markdown(f"""
+        <div class="footer">
+            {FOOTER}
+        </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
