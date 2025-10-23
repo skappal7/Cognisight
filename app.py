@@ -436,7 +436,7 @@ def sidebar_config():
     # LLM Provider Selection
     llm_provider = st.sidebar.selectbox(
         "Select LLM Provider",
-        ["OpenRouter (Free)", "Ollama (Local)", "LM Studio (Local)"],
+        ["OpenRouter (Cloud)", "Ollama (Local)", "LM Studio (Local)"],
         key="llm_provider"
     )
     
