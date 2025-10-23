@@ -79,21 +79,25 @@ st.markdown("""
     /* Button styling with Sutherland colors */
     .stButton>button {
         width: 100%;
-        background-color: var(--sutherland-pink);
+        background: linear-gradient(135deg, #E91E63 0%, #D81B60 100%);
         color: white;
         border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1rem;
-        font-weight: 600;
-        font-size: 0.9rem;
+        border-radius: 12px;
+        padding: 1.2rem 1rem;
+        font-weight: 700;
+        font-size: 1rem;
         transition: all 0.3s ease;
-        margin: 0.2rem 0;
+        margin: 0.3rem 0;
+        min-height: 60px;
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .stButton>button:hover {
-        background-color: #C2185B;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+        background: linear-gradient(135deg, #C2185B 0%, #AD1457 100%);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
     }
     
     /* Fix button container alignment */
@@ -251,18 +255,20 @@ st.markdown("""
         }
     }
     
-    /* Input box styling */
+    /* Input box styling - ChatGPT style */
     .stTextInput input {
         border-radius: 24px;
         border: 2px solid #e0e0e0;
-        padding: 0.8rem 1.2rem;
-        font-size: 0.95rem;
-        transition: border-color 0.3s ease;
+        padding: 1rem 1.5rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     
     .stTextInput input:focus {
         border-color: var(--sutherland-pink);
-        box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.1);
+        box-shadow: 0 4px 16px rgba(233, 30, 99, 0.15);
+        outline: none;
     }
     
     /* Scrollbar styling */
@@ -758,25 +764,31 @@ def download_session():
         st.sidebar.error(f"❌ Error preparing download: {str(e)}")
 
 def display_chat_history():
-    """Display chat history with modern message bubbles like ChatGPT/Chainlit"""
+    """Display chat history with properly aligned avatars"""
     for idx, msg in enumerate(st.session_state.messages):
         is_user = msg['role'] == 'user'
         
-        # Create message container
+        # User message - right aligned with avatar
         if is_user:
             st.markdown(f"""
-                <div class="message-row user-row">
-                    <div class="user-message">
+                <div style="display: flex; justify-content: flex-end; align-items: flex-start; margin: 1rem 0;">
+                    <div style="background: linear-gradient(135deg, #E91E63 0%, #D81B60 100%); color: white; padding: 1rem 1.2rem; border-radius: 18px 18px 4px 18px; max-width: 75%; margin-right: 0.8rem; word-wrap: break-word;">
                         {msg['content']}
                     </div>
-                    <div class="message-avatar user-avatar">U</div>
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #E91E63; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; flex-shrink: 0;">
+                        U
+                    </div>
                 </div>
             """, unsafe_allow_html=True)
+        
+        # Assistant message - left aligned with avatar
         else:
             st.markdown(f"""
-                <div class="message-row assistant-row">
-                    <div class="message-avatar assistant-avatar">AI</div>
-                    <div class="assistant-message">
+                <div style="display: flex; justify-content: flex-start; align-items: flex-start; margin: 1rem 0;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #2C3E50; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; flex-shrink: 0; margin-right: 0.8rem;">
+                        AI
+                    </div>
+                    <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); color: #2C3E50; padding: 1rem 1.2rem; border-radius: 18px 18px 18px 4px; max-width: 75%; border: 1px solid #e0e0e0; word-wrap: break-word;">
                         {msg['content']}
                     </div>
                 </div>
@@ -910,86 +922,79 @@ def main():
     """Main application"""
     init_session_state()
     
-    # Top bar with logo and title
-    col1, col2, col3 = st.columns([1, 6, 1])
+    # Fixed header layout
+    header_col1, header_col2 = st.columns([5, 1])
     
-    with col1:
-        st.markdown(f'<div class="app-title">{APP_TITLE}</div>', unsafe_allow_html=True)
+    with header_col1:
+        st.markdown(f"""
+            <div style="padding-top: 1rem;">
+                <h1 style="color: #2C3E50; font-size: 3rem; font-weight: 900; margin: 0; line-height: 1;">{APP_TITLE}</h1>
+                <p style="color: #999; font-size: 0.95rem; margin-top: 0.5rem;">Your intelligent assistant for comprehensive data analysis and visualization</p>
+            </div>
+        """, unsafe_allow_html=True)
     
-    with col2:
-        st.markdown('<p class="app-subtitle">Your intelligent assistant for comprehensive data analysis and visualization</p>', unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f'<img src="{LOGO_URL}" width="120">', unsafe_allow_html=True)
+    with header_col2:
+        st.markdown(f'<div style="text-align: right; padding-top: 1rem;"><img src="{LOGO_URL}" width="140"></div>', unsafe_allow_html=True)
     
     # Sidebar
     sidebar_config()
     
-    # Main chat area
     st.markdown("---")
     
     # Display chat history
     display_chat_history()
     
-    # Chat input
-    st.markdown("---")
+    # Action Cards ABOVE input box
+    if st.session_state.uploaded_files:  # Only show if data uploaded
+        st.markdown('<p style="margin-bottom: 0.5rem; font-weight: 600;">Quick Actions:</p>', unsafe_allow_html=True)
+        
+        # Row 1
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📊  DATA OVERVIEW", key="card_overview", use_container_width=True):
+                process_user_input("Provide a comprehensive overview of all uploaded datasets")
+                st.rerun()
+        with col2:
+            if st.button("📈  TREND ANALYSIS", key="card_trends", use_container_width=True):
+                process_user_input("Identify and visualize key trends in the data")
+                st.rerun()
+        with col3:
+            if st.button("🔍  ANOMALY DETECTION", key="card_anomaly", use_container_width=True):
+                process_user_input("Detect and explain any anomalies or outliers in the data")
+                st.rerun()
+        
+        # Row 2
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            if st.button("💡  INSIGHTS", key="card_insights", use_container_width=True):
+                process_user_input("Generate key insights and recommendations based on the data")
+                st.rerun()
+        with col5:
+            if st.button("📊  STATISTICAL ANALYSIS", key="card_stats", use_container_width=True):
+                process_user_input("Perform detailed statistical analysis on the data")
+                st.rerun()
+        with col6:
+            if st.button("💻  CODING", key="card_coding", use_container_width=True):
+                process_user_input("Generate Python code for data analysis and visualization")
+                st.rerun()
+        
+        st.markdown('<div style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
     
-    # Use columns for better layout
-    col1, col2 = st.columns([6, 1])
+    # Chat input with send icon inside (ChatGPT style)
+    st.markdown('<p style="margin-bottom: 0.3rem; font-weight: 500;">Ask me anything about your data...</p>', unsafe_allow_html=True)
     
-    with col1:
-        user_input = st.text_input(
-            "Ask me anything about your data...",
-            key="user_input",
-            placeholder="e.g., 'What are the top 10 customers by revenue?' or 'Show me sales trends over time'"
-        )
+    # Custom input with send button inside
+    user_input = st.text_input(
+        "message",
+        key="user_input",
+        placeholder="e.g., 'What are the top 10 customers by revenue?' or 'Show me sales trends over time'",
+        label_visibility="collapsed"
+    )
     
-    with col2:
-        send_button = st.button("Send 📤", use_container_width=True)
-    
-    # Process input
-    if send_button and user_input:
+    # Process on Enter key
+    if user_input:
         process_user_input(user_input)
         st.rerun()
-    
-    # Action Cards (matching the image design)
-    st.markdown("---")
-    
-    # Row 1 - Pink cards
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("📊\n\nDATA OVERVIEW", key="card_overview", use_container_width=True):
-            process_user_input("Provide a comprehensive overview of all uploaded datasets")
-            st.rerun()
-    
-    with col2:
-        if st.button("📈\n\nTREND ANALYSIS", key="card_trends", use_container_width=True):
-            process_user_input("Identify and visualize key trends in the data")
-            st.rerun()
-    
-    with col3:
-        if st.button("🔍\n\nANOMALY DETECTION", key="card_anomaly", use_container_width=True):
-            process_user_input("Detect and explain any anomalies or outliers in the data")
-            st.rerun()
-    
-    # Row 2 - Navy cards
-    col4, col5, col6 = st.columns(3)
-    
-    with col4:
-        if st.button("💡\n\nINSIGHTS", key="card_insights", use_container_width=True):
-            process_user_input("Generate key insights and recommendations based on the data")
-            st.rerun()
-    
-    with col5:
-        if st.button("📊\n\nSTATISTICAL ANALYSIS", key="card_stats", use_container_width=True):
-            process_user_input("Perform detailed statistical analysis on the data")
-            st.rerun()
-    
-    with col6:
-        if st.button("💻\n\nCODING", key="card_coding", use_container_width=True):
-            process_user_input("Generate Python code for data analysis and visualization")
-            st.rerun()
     
     # PDF Report Download
     if st.session_state.analysis_results:
