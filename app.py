@@ -24,7 +24,7 @@ from utils.visualizer import Visualizer
 
 # Page configuration
 st.set_page_config(
-    page_title="COGNISIGHT",
+    page_title="AI Data Analyst Agent",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -108,7 +108,7 @@ def sidebar_config():
     # LLM Provider Selection
     llm_provider = st.sidebar.selectbox(
         "Select LLM Provider",
-        ["OpenRouter (Free)", "OpenRouter (Paid)", "Ollama (Local)", "LM Studio (Local)"],
+        ["OpenRouter (Free)", "Ollama (Local)", "LM Studio (Local)"],
         key="llm_provider"
     )
     
@@ -120,21 +120,30 @@ def sidebar_config():
             help="Get your API key from https://openrouter.ai"
         )
         
-        if "Free" in llm_provider:
-            model_options = [
-                "google/gemini-flash-1.5-8b",
-                "meta-llama/llama-3.2-3b-instruct",
-                "qwen/qwen-2-7b-instruct"
-            ]
-        else:
-            model_options = [
-                "anthropic/claude-3.5-sonnet",
-                "openai/gpt-4o",
-                "google/gemini-pro-1.5",
-                "deepseek/deepseek-chat"
-            ]
+        # Friendly display names for free models
+        model_display_names = {
+            "DeepSeek Chat V3": "deepseek/deepseek-chat-v3.1:free",
+            "DeepSeek R1 70B": "deepseek/deepseek-r1-distill-llama-70b:free",
+            "Llama 3.3 70B": "meta-llama/llama-3.3-70b-instruct:free",
+            "Qwen 32B Vision": "qwen/qwen2.5-vl-32b-instruct:free",
+            "Qwen 235B": "qwen/qwen3-235b-a22b:free",
+            "Mistral 7B": "mistralai/mistral-7b-instruct:free",
+            "OpenChat 7B": "openchat/openchat-7b:free",
+            "MythoMax 13B": "gryphe/mythomax-l2-13b:free",
+            "GPT OSS 20B": "openai/gpt-oss-20b:free",
+            "Llama 4 Maverick": "meta-llama/llama-4-maverick:free",
+            "Kimi Vision 3B": "moonshotai/kimi-vl-a3b-thinking:free",
+            "Kimi K2": "moonshotai/kimi-k2:free"
+        }
         
-        model = st.sidebar.selectbox("Select Model", model_options)
+        # Show friendly names in dropdown
+        selected_display_name = st.sidebar.selectbox(
+            "Select Model", 
+            list(model_display_names.keys())
+        )
+        
+        # Get actual model ID for API
+        model = model_display_names[selected_display_name]
         base_url = "https://openrouter.ai/api/v1"
         
     else:  # Local models
