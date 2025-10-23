@@ -17,61 +17,69 @@ class DataManager:
     and DuckDB for analytical queries
     """
     
-    def __init__(self):
+    def __init__(self, cache_dir: str = ".cache/data"):
         self.tables: Dict[str, pl.DataFrame] = {}
-        self.db = duckdb.connect(':memory:')  # In-memory DuckDB instance
+        self.db = duckdb.connect(':memory:')
         self.file_metadata: Dict[str, Dict] = {}
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
     
     def load_file(self, file) -> pl.DataFrame:
         """
-        Load file into Polars DataFrame and auto-generate summaries
-        
-        Args:
-            file: Streamlit UploadedFile object or file path
-            
-        Returns:
-            Polars DataFrame
+        Load file, convert to Parquet, generate DuckDB summaries
         """
         file_name = file.name if hasattr(file, 'name') else str(file)
         file_ext = Path(file_name).suffix.lower()
+        table_name = Path(file_name).stem
         
         try:
+            # Load data
             if file_ext == '.csv':
-                # First pass - detect problematic columns
                 try:
-                    df = pl.read_csv(
-                        file,
-                        infer_schema_length=10000,
-                        ignore_errors=False
-                    )
-                except Exception as e:
-                    # If parsing fails, read with all columns as strings first
-                    df = pl.read_csv(
-                        file,
-                        infer_schema_length=0,  # Treat all as strings
-                        ignore_errors=True
-                    )
-                    
-                    # Try to convert columns to appropriate types
+                    df = pl.read_csv(file, infer_schema_length=10000)
+                except:
+                    df = pl.read_csv(file, infer_schema_length=0)
                     for col in df.columns:
                         try:
-                            # Try to convert to numeric if possible
-                            df = df.with_columns(
-                                pl.col(col).cast(pl.Float64, strict=False).alias(col)
-                            )
+                            df = df.with_columns(pl.col(col).cast(pl.Float64, strict=False).alias(col))
                         except:
-                            # Keep as string if conversion fails
                             pass
             elif file_ext == '.parquet':
                 df = pl.read_parquet(file)
             elif file_ext in ['.xlsx', '.xls']:
-                # Use pandas to read Excel, then convert to Polars
-                pandas_df = pd.read_excel(file)
-                df = pl.from_pandas(pandas_df)
+                df = pl.from_pandas(pd.read_excel(file))
             elif file_ext == '.json':
                 df = pl.read_json(file)
             else:
-                raise ValueError(f"Unsupported file format: {file_ext}")
+                raise ValueError(f"Unsupported: {file_ext}")
+            
+            # Save as Parquet
+            parquet_path = self.cache_dir / f"{table_name}.parquet"
+            df.write_parquet(parquet_path)
+            
+            # Mask PII
+            df = self._mask_pii_columns(df)
+            
+            # Store and register
+            self.tables[table_name] = df
+            self.db.register(table_name, df.to_pandas())
+            
+            # Generate summaries
+            summaries = self._generate_top_n_summaries(table_name, df)
+            
+            # Store metadata
+            self.file_metadata[table_name] = {
+                'filename': file_name,
+                'parquet_path': str(parquet_path),
+                'summaries': summaries,
+                'shape': (df.height, df.width),
+                'upload_time': datetime.now().isoformat()
+            }
+            
+            return df
+            
+        except Exception as e:
+            raise Exception(f"Error loading {file_name}: {str(e)}")
             
             # Detect and mask PII columns (GDPR compliance)
             df = self._mask_pii_columns(df)
@@ -129,6 +137,46 @@ class DataManager:
                 print(f"⚠️ Masked PII column: {col}")
         
         return masked_df
+    
+    
+    def _generate_top_n_summaries(self, table_name: str, df: pl.DataFrame, top_n: int = 10) -> Dict[str, Any]:
+        """Generate Top N categorical × numerical summaries using DuckDB"""
+        
+        summaries = {
+            'row_count': df.height,
+            'column_count': df.width,
+            'memory_mb': df.estimated_size() / (1024 * 1024)
+        }
+        
+        # Identify column types
+        categorical_cols = [col for col, dtype in zip(df.columns, df.dtypes) if dtype == pl.Utf8]
+        numerical_cols = [col for col, dtype in zip(df.columns, df.dtypes) 
+                         if dtype in [pl.Int64, pl.Int32, pl.Float64, pl.Float32]]
+        
+        summaries['top_n_analysis'] = {}
+        
+        # For each categorical, get Top 10 by each numerical
+        for cat_col in categorical_cols[:5]:
+            for num_col in numerical_cols[:5]:
+                try:
+                    query = f"""
+                    SELECT "{cat_col}", SUM("{num_col}") as total
+                    FROM {table_name}
+                    WHERE "{cat_col}" IS NOT NULL AND "{num_col}" IS NOT NULL
+                    GROUP BY "{cat_col}"
+                    ORDER BY total DESC
+                    LIMIT {top_n}
+                    """
+                    result = self.db.execute(query).fetchall()
+                    
+                    summaries['top_n_analysis'][f"{cat_col}_by_{num_col}"] = [
+                        {'category': str(row[0]), 'value': float(row[1])} 
+                        for row in result
+                    ]
+                except Exception as e:
+                    pass  # Skip if query fails
+        
+        return summaries
     
     def _generate_auto_summary(self, table_name: str, df: pl.DataFrame) -> Dict[str, Any]:
         """
