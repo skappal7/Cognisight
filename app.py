@@ -13,7 +13,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 import plotly.express as px
 import plotly.graph_objects as go
-from streamlit_chat import message
 
 # Import our custom modules
 from core.agent import DataAnalystAgent
@@ -21,6 +20,7 @@ from core.data_manager import DataManager
 from core.llm_client import LLMClient
 from utils.cache_manager import CacheManager
 from utils.visualizer import Visualizer
+from utils.report_generator import ReportGenerator
 
 # Branding Configuration
 LOGO_URL = "https://raw.githubusercontent.com/skappal7/TextAnalyser/refs/heads/main/logo.png"
@@ -28,7 +28,7 @@ FOOTER = "Developed with Streamlit with 💗 by CE Team Innovation Lab 2025"
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Data Analyst Agent",
+    page_title="COGNISIGHT",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -126,9 +126,160 @@ st.markdown("""
         animation: slideIn 0.6s ease-out;
     }
     
-    /* Chat message styling */
-    .stChatMessage {
-        animation: messageSlide 0.4s ease-out;
+    /* Chat message bubbles - Modern ChatGPT/Chainlit style */
+    .user-message {
+        background: linear-gradient(135deg, var(--sutherland-pink) 0%, #D81B60 100%);
+        color: white;
+        padding: 1rem 1.2rem;
+        border-radius: 18px 18px 4px 18px;
+        margin: 0.8rem 0 0.8rem auto;
+        max-width: 75%;
+        box-shadow: 0 2px 8px rgba(233, 30, 99, 0.2);
+        animation: messageSlideLeft 0.4s ease-out;
+        word-wrap: break-word;
+    }
+    
+    .assistant-message {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        color: var(--sutherland-navy);
+        padding: 1rem 1.2rem;
+        border-radius: 18px 18px 18px 4px;
+        margin: 0.8rem auto 0.8rem 0;
+        max-width: 75%;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        animation: messageSlideRight 0.4s ease-out;
+        word-wrap: break-word;
+    }
+    
+    .message-container {
+        display: flex;
+        flex-direction: column;
+        margin: 0.5rem 0;
+    }
+    
+    .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+        margin: 0 0.5rem;
+    }
+    
+    .user-avatar {
+        background: var(--sutherland-pink);
+        color: white;
+    }
+    
+    .assistant-avatar {
+        background: var(--sutherland-navy);
+        color: white;
+    }
+    
+    .message-row {
+        display: flex;
+        align-items: flex-end;
+        margin: 0.5rem 0;
+    }
+    
+    .user-row {
+        justify-content: flex-end;
+    }
+    
+    .assistant-row {
+        justify-content: flex-start;
+    }
+    
+    .message-timestamp {
+        font-size: 0.75rem;
+        color: #999;
+        margin: 0.2rem 0.5rem;
+    }
+    
+    /* Thinking indicator */
+    .thinking-indicator {
+        display: inline-block;
+        padding: 0.8rem 1.2rem;
+        background: #f0f2f6;
+        border-radius: 18px;
+        margin: 0.5rem 0;
+    }
+    
+    .thinking-dots span {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--sutherland-pink);
+        margin: 0 2px;
+        animation: thinking 1.4s ease-in-out infinite;
+    }
+    
+    .thinking-dots span:nth-child(1) { animation-delay: 0s; }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes thinking {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-10px); opacity: 1; }
+    }
+    
+    @keyframes messageSlideLeft {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes messageSlideRight {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    /* Input box styling */
+    .stTextInput input {
+        border-radius: 24px;
+        border: 2px solid #e0e0e0;
+        padding: 0.8rem 1.2rem;
+        font-size: 0.95rem;
+        transition: border-color 0.3s ease;
+    }
+    
+    .stTextInput input:focus {
+        border-color: var(--sutherland-pink);
+        box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.1);
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--sutherland-pink);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #C2185B;
     }
     
     /* Loading animation */
@@ -285,7 +436,7 @@ def sidebar_config():
     # LLM Provider Selection
     llm_provider = st.sidebar.selectbox(
         "Select LLM Provider",
-        ["OpenRouter (Cloud)", "Ollama (Local)", "LM Studio (Local)"],
+        ["OpenRouter (Free)", "Ollama (Local)", "LM Studio (Local)"],
         key="llm_provider"
     )
     
@@ -486,63 +637,75 @@ def download_session():
         st.sidebar.error(f"❌ Error preparing download: {str(e)}")
 
 def display_chat_history():
-    """Display chat history with proper formatting"""
+    """Display chat history with modern message bubbles like ChatGPT/Chainlit"""
     for idx, msg in enumerate(st.session_state.messages):
         is_user = msg['role'] == 'user'
         
-        # Display message
-        message(
-            msg['content'],
-            is_user=is_user,
-            key=f"msg_{idx}",
-            avatar_style="avataaars" if is_user else "bottts"
-        )
+        # Create message container
+        if is_user:
+            st.markdown(f"""
+                <div class="message-row user-row">
+                    <div class="user-message">
+                        {msg['content']}
+                    </div>
+                    <div class="message-avatar user-avatar">U</div>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div class="message-row assistant-row">
+                    <div class="message-avatar assistant-avatar">AI</div>
+                    <div class="assistant-message">
+                        {msg['content']}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
         
         # Display visualizations if present
         if 'visualizations' in msg and msg['visualizations']:
             for viz_idx, viz_data in enumerate(msg['visualizations']):
-                st.plotly_chart(
-                    viz_data['figure'],
-                    use_container_width=True,
-                    key=f"viz_{idx}_{viz_idx}"
-                )
-                
-                # Add download button for visualization
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([5, 1])
+                with col1:
+                    st.plotly_chart(
+                        viz_data['figure'],
+                        use_container_width=True,
+                        key=f"viz_{idx}_{viz_idx}"
+                    )
                 with col2:
                     st.download_button(
-                        label="⬇️ Download",
+                        label="📥",
                         data=viz_data['figure'].to_html(),
                         file_name=f"{viz_data['title'].replace(' ', '_')}.html",
                         mime="text/html",
-                        key=f"download_viz_{idx}_{viz_idx}"
+                        key=f"download_viz_{idx}_{viz_idx}",
+                        help="Download visualization"
                     )
         
         # Display data tables if present
         if 'data_tables' in msg and msg['data_tables']:
             for table_idx, table_data in enumerate(msg['data_tables']):
-                st.dataframe(
-                    table_data['dataframe'],
-                    use_container_width=True,
-                    key=f"table_{idx}_{table_idx}"
-                )
-                
-                # Add download button for data
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([5, 1])
+                with col1:
+                    st.dataframe(
+                        table_data['dataframe'],
+                        use_container_width=True,
+                        key=f"table_{idx}_{table_idx}"
+                    )
                 with col2:
                     csv_data = table_data['dataframe'].to_pandas().to_csv(index=False)
                     st.download_button(
-                        label="⬇️ CSV",
+                        label="📥",
                         data=csv_data,
                         file_name=f"{table_data.get('title', 'data')}.csv",
                         mime="text/csv",
-                        key=f"download_table_{idx}_{table_idx}"
+                        key=f"download_table_{idx}_{table_idx}",
+                        help="Download as CSV"
                     )
 
 def process_user_input(user_input: str):
     """Process user input and generate response"""
     if not st.session_state.agent:
-        st.error("⚠️ Please initialize the LLM first from the sidebar!")
+        st.error("⚠️ Please select a model from the sidebar!")
         return
     
     if not st.session_state.uploaded_files:
@@ -557,54 +720,66 @@ def process_user_input(user_input: str):
     })
     
     # Show thinking indicator
-    with st.spinner("🤔 Analyzing..."):
-        try:
-            # Process with agent
-            response = st.session_state.agent.process_query(
-                query=user_input,
-                conversation_history=st.session_state.messages
-            )
-            
-            # Add assistant response
-            assistant_message = {
-                'role': 'assistant',
-                'content': response['narrative'],
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            # Add visualizations if generated
-            if response.get('visualizations'):
-                assistant_message['visualizations'] = response['visualizations']
-            
-            # Add data tables if generated
-            if response.get('data_tables'):
-                assistant_message['data_tables'] = response['data_tables']
-            
-            st.session_state.messages.append(assistant_message)
-            
-            # Update token usage
-            if 'token_usage' in response:
-                for key in st.session_state.token_usage:
-                    st.session_state.token_usage[key] += response['token_usage'].get(key, 0)
-            
-            # Store analysis result
-            st.session_state.analysis_results.append({
-                'query': user_input,
-                'response': response,
-                'timestamp': datetime.now().isoformat()
-            })
-            
-            # Auto-save session
-            if len(st.session_state.messages) % 5 == 0:  # Save every 5 messages
-                save_session()
-            
-        except Exception as e:
-            st.error(f"❌ Error processing query: {str(e)}")
-            st.session_state.messages.append({
-                'role': 'assistant',
-                'content': f"I encountered an error: {str(e)}. Please try rephrasing your question.",
-                'timestamp': datetime.now().isoformat()
-            })
+    thinking_placeholder = st.empty()
+    thinking_placeholder.markdown("""
+        <div class="thinking-indicator">
+            <div class="thinking-dots">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    try:
+        # Process with agent
+        response = st.session_state.agent.process_query(
+            query=user_input,
+            conversation_history=st.session_state.messages
+        )
+        
+        # Remove thinking indicator
+        thinking_placeholder.empty()
+        
+        # Add assistant response
+        assistant_message = {
+            'role': 'assistant',
+            'content': response['narrative'],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Add visualizations if generated
+        if response.get('visualizations'):
+            assistant_message['visualizations'] = response['visualizations']
+        
+        # Add data tables if generated
+        if response.get('data_tables'):
+            assistant_message['data_tables'] = response['data_tables']
+        
+        st.session_state.messages.append(assistant_message)
+        
+        # Update token usage
+        if 'token_usage' in response:
+            for key in st.session_state.token_usage:
+                st.session_state.token_usage[key] += response['token_usage'].get(key, 0)
+        
+        # Store analysis result for PDF generation
+        st.session_state.analysis_results.append({
+            'query': user_input,
+            'response': response,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        # Auto-save session
+        if len(st.session_state.messages) % 5 == 0:  # Save every 5 messages
+            save_session()
+        
+    except Exception as e:
+        thinking_placeholder.empty()
+        st.error(f"❌ Error processing query: {str(e)}")
+        st.session_state.messages.append({
+            'role': 'assistant',
+            'content': f"I encountered an error: {str(e)}. Please try rephrasing your question.",
+            'timestamp': datetime.now().isoformat()
+        })
 
 def main():
     """Main application"""
@@ -618,7 +793,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # Header
-    st.markdown('<h1 class="main-header">📊 AI Data Analyst Agent</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">📊 COGNISIGHT</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="sub-header">Your intelligent assistant for comprehensive data analysis and visualization</p>',
         unsafe_allow_html=True
@@ -677,6 +852,52 @@ def main():
         if st.button("💡 Insights", use_container_width=True):
             process_user_input("Generate key insights and recommendations based on the data")
             st.rerun()
+    
+    # PDF Report Download
+    if st.session_state.analysis_results:
+        st.markdown("---")
+        st.markdown("#### 📄 Export Analysis")
+        
+        if st.button("📥 Download PDF Report", use_container_width=True, type="primary"):
+            try:
+                # Generate PDF report
+                report_gen = ReportGenerator()
+                
+                # Get last analysis
+                last_analysis = st.session_state.analysis_results[-1]
+                
+                # Get data summary
+                data_summary = {}
+                if st.session_state.uploaded_files:
+                    first_file = list(st.session_state.uploaded_files.keys())[0]
+                    df_info = st.session_state.uploaded_files[first_file]
+                    data_summary = {
+                        'row_count': df_info['dataframe'].height,
+                        'column_count': df_info['dataframe'].width,
+                        'memory_mb': df_info['file_size'] / (1024 * 1024)
+                    }
+                
+                # Generate PDF
+                pdf_bytes = report_gen.generate_report(
+                    title="Data Analysis Report",
+                    query=last_analysis['query'],
+                    analysis_text=last_analysis['response']['narrative'],
+                    data_summary=data_summary,
+                    visualizations=last_analysis['response'].get('visualizations', []),
+                    tables=last_analysis['response'].get('data_tables', [])
+                )
+                
+                # Download button
+                st.download_button(
+                    label="📥 Download Report",
+                    data=pdf_bytes,
+                    file_name=f"analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+                
+            except Exception as e:
+                st.error(f"Error generating PDF: {str(e)}")
     
     # Footer
     st.markdown("---")
