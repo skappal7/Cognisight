@@ -29,7 +29,7 @@ APP_TITLE = "COGNiNSIGHTS"
 
 # Page configuration
 st.set_page_config(
-    page_title="COGNiNSIGHTS",
+    page_title="COGNiNSIGHTS - AI Data Analyst",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -503,6 +503,9 @@ def init_session_state():
     if 'uploaded_files' not in st.session_state:
         st.session_state.uploaded_files = {}
     
+    if 'top_n' not in st.session_state:
+        st.session_state.top_n = 10  # Default Top N value
+    
     if 'token_usage' not in st.session_state:
         st.session_state.token_usage = {
             'total_tokens': 0,
@@ -611,6 +614,17 @@ def sidebar_config():
     
     # File Upload Section
     st.sidebar.markdown("### 📁 Data Upload")
+    
+    # Top N selector
+    st.session_state.top_n = st.sidebar.slider(
+        "Top N Records for Summaries",
+        min_value=5,
+        max_value=50,
+        value=st.session_state.top_n,
+        step=5,
+        help="Select how many top records to include in categorical × numerical summaries"
+    )
+    
     uploaded_files = st.sidebar.file_uploader(
         "Upload data files",
         type=['csv', 'parquet', 'xlsx', 'json'],
@@ -621,17 +635,37 @@ def sidebar_config():
     if uploaded_files:
         for file in uploaded_files:
             if file.name not in st.session_state.uploaded_files:
-                with st.sidebar.spinner(f"📊 Generating summaries for {file.name}..."):
-                    try:
-                        df = st.session_state.data_manager.load_file(file)
-                        st.session_state.uploaded_files[file.name] = {
-                            'dataframe': df,
-                            'upload_time': datetime.now(),
-                            'file_size': file.size
-                        }
-                        st.sidebar.success(f"✅ {file.name} - Summaries ready!")
-                    except Exception as e:
-                        st.sidebar.error(f"❌ {file.name}: {str(e)}")
+                # Show detailed progress
+                progress_text = st.sidebar.empty()
+                progress_bar = st.sidebar.progress(0)
+                
+                try:
+                    progress_text.text(f"📥 Loading {file.name}...")
+                    progress_bar.progress(25)
+                    
+                    progress_text.text(f"💾 Converting to Parquet...")
+                    progress_bar.progress(50)
+                    
+                    progress_text.text(f"🦆 Generating DuckDB summaries (Top {st.session_state.top_n})...")
+                    progress_bar.progress(75)
+                    
+                    # Pass top_n to load_file
+                    df = st.session_state.data_manager.load_file(file, top_n=st.session_state.top_n)
+                    
+                    progress_bar.progress(100)
+                    progress_text.empty()
+                    progress_bar.empty()
+                    
+                    st.session_state.uploaded_files[file.name] = {
+                        'dataframe': df,
+                        'upload_time': datetime.now(),
+                        'file_size': file.size
+                    }
+                    st.sidebar.success(f"✅ {file.name} - Summaries ready!")
+                except Exception as e:
+                    progress_text.empty()
+                    progress_bar.empty()
+                    st.sidebar.error(f"❌ {file.name}: {str(e)}")
     
     # Display uploaded files
     if st.session_state.uploaded_files:
@@ -773,21 +807,25 @@ def display_chat_history():
             for table_idx, table_data in enumerate(msg['data_tables']):
                 col1, col2 = st.columns([5, 1])
                 with col1:
-                    st.dataframe(
-                        table_data['dataframe'],
-                        use_container_width=True,
-                        key=f"table_{idx}_{table_idx}"
-                    )
+                    # Handle different dict keys
+                    df = table_data.get('dataframe') or table_data.get('data')
+                    if df is not None:
+                        st.dataframe(
+                            df,
+                            use_container_width=True,
+                            key=f"table_{idx}_{table_idx}"
+                        )
                 with col2:
-                    csv_data = table_data['dataframe'].to_pandas().to_csv(index=False)
-                    st.download_button(
-                        label="📥",
-                        data=csv_data,
-                        file_name=f"{table_data.get('title', 'data')}.csv",
-                        mime="text/csv",
-                        key=f"download_table_{idx}_{table_idx}",
-                        help="Download as CSV"
-                    )
+                    if df is not None:
+                        csv_data = df.to_pandas().to_csv(index=False)
+                        st.download_button(
+                            label="📥",
+                            data=csv_data,
+                            file_name=f"{table_data.get('title', 'data')}.csv",
+                            mime="text/csv",
+                            key=f"download_table_{idx}_{table_idx}",
+                            help="Download as CSV"
+                        )
 
 def process_user_input(user_input: str):
     """Process user input and generate response"""
