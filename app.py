@@ -28,7 +28,7 @@ FOOTER = "Developed with Streamlit with 💗 by CE Team Innovation Lab 2025"
 
 # Page configuration
 st.set_page_config(
-    page_title="COGNISIGHT",
+    page_title="AI Data Analyst Agent",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -59,7 +59,7 @@ st.markdown("""
     
     /* Header styling */
     .main-header {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
         color: var(--sutherland-navy);
         text-align: center;
@@ -68,10 +68,10 @@ st.markdown("""
     }
     
     .sub-header {
-        font-size: 1.2rem;
+        font-size: 1rem;
         color: #666;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         animation: fadeIn 1.2s ease-in;
     }
     
@@ -82,15 +82,32 @@ st.markdown("""
         color: white;
         border: none;
         border-radius: 8px;
-        padding: 0.5rem 1rem;
+        padding: 0.6rem 1rem;
         font-weight: 600;
+        font-size: 0.9rem;
         transition: all 0.3s ease;
+        margin: 0.2rem 0;
     }
     
     .stButton>button:hover {
         background-color: #C2185B;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+    }
+    
+    /* Fix button container alignment */
+    .stButton {
+        text-align: center;
+    }
+    
+    /* Column alignment for buttons */
+    [data-testid="column"] {
+        display: flex;
+        align-items: stretch;
+    }
+    
+    [data-testid="column"] .stButton {
+        width: 100%;
     }
     
     /* Sidebar styling */
@@ -274,11 +291,12 @@ def sidebar_config():
     
     # Provider-specific settings
     if "OpenRouter" in llm_provider:
-        api_key = st.sidebar.text_input(
-            "OpenRouter API Key",
-            type="password",
-            help="Get your API key from https://openrouter.ai"
-        )
+        # Auto-load API key from secrets (hidden from user)
+        api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+        
+        if not api_key:
+            st.sidebar.error("⚠️ OPENROUTER_API_KEY not found in secrets. Add it in Streamlit Cloud settings.")
+            return
         
         # Friendly display names for free models
         model_display_names = {
@@ -306,6 +324,25 @@ def sidebar_config():
         model = model_display_names[selected_display_name]
         base_url = "https://openrouter.ai/api/v1"
         
+        # Auto-initialize LLM when model changes
+        try:
+            if st.session_state.llm_client is None or st.session_state.get('current_model') != model:
+                st.session_state.llm_client = LLMClient(
+                    provider=llm_provider,
+                    api_key=api_key,
+                    base_url=base_url,
+                    model=model
+                )
+                st.session_state.agent = DataAnalystAgent(
+                    llm_client=st.session_state.llm_client,
+                    data_manager=st.session_state.data_manager,
+                    cache_manager=st.session_state.cache_manager
+                )
+                st.session_state.current_model = model
+                st.sidebar.success(f"✅ Ready: {selected_display_name}")
+        except Exception as e:
+            st.sidebar.error(f"❌ Error: {str(e)}")
+        
     else:  # Local models
         api_key = "local"
         base_url = st.sidebar.text_input(
@@ -313,12 +350,9 @@ def sidebar_config():
             value="http://localhost:11434" if "Ollama" in llm_provider else "http://localhost:1234/v1"
         )
         model = st.sidebar.text_input("Model Name", value="llama3.2:3b" if "Ollama" in llm_provider else "local-model")
-    
-    # Initialize LLM Client
-    if st.sidebar.button("Initialize LLM", use_container_width=True):
-        if not api_key and "OpenRouter" in llm_provider:
-            st.sidebar.error("Please provide an API key")
-        else:
+        
+        # Auto-initialize for local models
+        if st.sidebar.button("Connect to Local Model", use_container_width=True):
             try:
                 st.session_state.llm_client = LLMClient(
                     provider=llm_provider,
@@ -331,9 +365,9 @@ def sidebar_config():
                     data_manager=st.session_state.data_manager,
                     cache_manager=st.session_state.cache_manager
                 )
-                st.sidebar.success(f"✅ LLM initialized: {model}")
+                st.sidebar.success(f"✅ Connected: {model}")
             except Exception as e:
-                st.sidebar.error(f"Error initializing LLM: {str(e)}")
+                st.sidebar.error(f"❌ Error: {str(e)}")
     
     st.sidebar.markdown("---")
     
