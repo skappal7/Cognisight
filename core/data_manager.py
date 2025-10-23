@@ -23,7 +23,7 @@ class DataManager:
     
     def load_file(self, file) -> pl.DataFrame:
         """
-        Load file into Polars DataFrame
+        Load file into Polars DataFrame and auto-generate summaries
         
         Args:
             file: Streamlit UploadedFile object or file path
@@ -48,6 +48,9 @@ class DataManager:
             else:
                 raise ValueError(f"Unsupported file format: {file_ext}")
             
+            # Detect and mask PII columns (GDPR compliance)
+            df = self._mask_pii_columns(df)
+            
             # Store in tables
             table_name = Path(file_name).stem
             self.tables[table_name] = df
@@ -55,19 +58,190 @@ class DataManager:
             # Register with DuckDB for SQL queries
             self.db.register(table_name, df.to_pandas())
             
-            # Store metadata
+            # Auto-generate comprehensive summary using DuckDB
+            summary = self._generate_auto_summary(table_name, df)
+            
+            # Store metadata with summary
             self.file_metadata[table_name] = {
                 'filename': file_name,
                 'format': file_ext,
                 'shape': (df.height, df.width),
                 'columns': df.columns,
-                'dtypes': {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)}
+                'dtypes': {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)},
+                'auto_summary': summary,
+                'upload_time': datetime.now().isoformat()
             }
             
             return df
             
         except Exception as e:
             raise Exception(f"Error loading file {file_name}: {str(e)}")
+    
+    def _mask_pii_columns(self, df: pl.DataFrame) -> pl.DataFrame:
+        """
+        Detect and mask potential PII columns for GDPR compliance
+        
+        Args:
+            df: Input DataFrame
+            
+        Returns:
+            DataFrame with PII columns masked
+        """
+        pii_keywords = ['email', 'phone', 'ssn', 'passport', 'license', 'credit_card', 
+                       'address', 'zipcode', 'postal', 'ip_address', 'mac_address']
+        
+        masked_df = df.clone()
+        
+        for col in df.columns:
+            col_lower = col.lower()
+            # Check if column name contains PII keywords
+            if any(keyword in col_lower for keyword in pii_keywords):
+                # Mask the column
+                if df[col].dtype == pl.Utf8:
+                    masked_df = masked_df.with_columns(
+                        pl.lit("***MASKED***").alias(col)
+                    )
+                print(f"⚠️ Masked PII column: {col}")
+        
+        return masked_df
+    
+    def _generate_auto_summary(self, table_name: str, df: pl.DataFrame) -> Dict[str, Any]:
+        """
+        Auto-generate comprehensive statistical summary using DuckDB
+        This runs immediately on upload for efficient LLM context
+        
+        Args:
+            table_name: Name of the table
+            df: DataFrame to summarize
+            
+        Returns:
+            Dictionary with comprehensive summary statistics
+        """
+        summary = {
+            'row_count': df.height,
+            'column_count': df.width,
+            'memory_mb': df.estimated_size() / (1024 * 1024),
+            'columns': {}
+        }
+        
+        # Generate column-level summaries using DuckDB for efficiency
+        for col in df.columns:
+            dtype = df[col].dtype
+            
+            col_summary = {
+                'dtype': str(dtype),
+                'null_count': int(df[col].null_count()),
+                'null_percentage': float(df[col].null_count() / df.height * 100) if df.height > 0 else 0
+            }
+            
+            # Numeric columns - use DuckDB for fast aggregation
+            if dtype in [pl.Int64, pl.Int32, pl.Int16, pl.Int8, pl.Float64, pl.Float32]:
+                try:
+                    stats_query = f"""
+                    SELECT 
+                        MIN("{col}") as min_val,
+                        MAX("{col}") as max_val,
+                        AVG("{col}") as mean_val,
+                        MEDIAN("{col}") as median_val,
+                        STDDEV("{col}") as std_val,
+                        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY "{col}") as q25,
+                        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY "{col}") as q75,
+                        COUNT(DISTINCT "{col}") as unique_count
+                    FROM {table_name}
+                    """
+                    stats_result = self.db.execute(stats_query).fetchone()
+                    
+                    col_summary.update({
+                        'min': float(stats_result[0]) if stats_result[0] is not None else None,
+                        'max': float(stats_result[1]) if stats_result[1] is not None else None,
+                        'mean': float(stats_result[2]) if stats_result[2] is not None else None,
+                        'median': float(stats_result[3]) if stats_result[3] is not None else None,
+                        'std': float(stats_result[4]) if stats_result[4] is not None else None,
+                        'q25': float(stats_result[5]) if stats_result[5] is not None else None,
+                        'q75': float(stats_result[6]) if stats_result[6] is not None else None,
+                        'unique': int(stats_result[7]) if stats_result[7] is not None else 0
+                    })
+                except Exception as e:
+                    print(f"Error calculating stats for {col}: {e}")
+            
+            # String columns - get top values and unique count
+            elif dtype == pl.Utf8:
+                try:
+                    unique_query = f"""
+                    SELECT COUNT(DISTINCT "{col}") as unique_count
+                    FROM {table_name}
+                    """
+                    unique_count = self.db.execute(unique_query).fetchone()[0]
+                    
+                    # Get top 5 values
+                    top_values_query = f"""
+                    SELECT "{col}", COUNT(*) as count
+                    FROM {table_name}
+                    WHERE "{col}" IS NOT NULL
+                    GROUP BY "{col}"
+                    ORDER BY count DESC
+                    LIMIT 5
+                    """
+                    top_values = self.db.execute(top_values_query).fetchall()
+                    
+                    col_summary['unique'] = int(unique_count)
+                    col_summary['top_values'] = [
+                        {'value': str(val[0]), 'count': int(val[1])} 
+                        for val in top_values
+                    ]
+                except Exception as e:
+                    print(f"Error calculating stats for {col}: {e}")
+            
+            # Date/Datetime columns
+            elif dtype in [pl.Date, pl.Datetime]:
+                try:
+                    date_query = f"""
+                    SELECT 
+                        MIN("{col}") as min_date,
+                        MAX("{col}") as max_date
+                    FROM {table_name}
+                    """
+                    date_result = self.db.execute(date_query).fetchone()
+                    col_summary.update({
+                        'min': str(date_result[0]) if date_result[0] else None,
+                        'max': str(date_result[1]) if date_result[1] else None
+                    })
+                except Exception as e:
+                    print(f"Error calculating stats for {col}: {e}")
+            
+            summary['columns'][col] = col_summary
+        
+        # Generate correlations for numeric columns using DuckDB
+        numeric_cols = [col for col, dtype in zip(df.columns, df.dtypes)
+                       if dtype in [pl.Int64, pl.Int32, pl.Float64, pl.Float32]]
+        
+        if len(numeric_cols) >= 2:
+            try:
+                summary['correlations'] = self._calculate_correlations_duckdb(table_name, numeric_cols)
+            except Exception as e:
+                print(f"Error calculating correlations: {e}")
+        
+        return summary
+    
+    def _calculate_correlations_duckdb(self, table_name: str, numeric_cols: List[str]) -> Dict[str, float]:
+        """Calculate correlations between numeric columns using DuckDB"""
+        correlations = {}
+        
+        for i, col1 in enumerate(numeric_cols):
+            for col2 in numeric_cols[i+1:]:
+                try:
+                    corr_query = f"""
+                    SELECT CORR("{col1}", "{col2}") as correlation
+                    FROM {table_name}
+                    WHERE "{col1}" IS NOT NULL AND "{col2}" IS NOT NULL
+                    """
+                    corr = self.db.execute(corr_query).fetchone()[0]
+                    if corr is not None:
+                        correlations[f"{col1}_vs_{col2}"] = float(corr)
+                except:
+                    pass
+        
+        return correlations
     
     def get_table(self, table_name: str) -> Optional[pl.DataFrame]:
         """Get table by name"""
