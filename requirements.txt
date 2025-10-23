@@ -1,0 +1,26 @@
+# Core Dependencies
+streamlit>=1.31.0
+polars>=0.20.0
+duckdb>=0.10.0
+pandas>=2.2.0
+
+# LLM and API
+requests>=2.31.0
+openai>=1.0.0  # For OpenAI-compatible APIs
+
+# Visualization
+plotly>=5.18.0
+streamlit-chat>=0.1.1
+
+# Data Processing
+numpy>=1.24.0
+scipy>=1.12.0
+openpyxl>=3.1.0  # For Excel files
+
+# Utilities
+python-dateutil>=2.8.2
+pytz>=2024.1
+
+# Optional but recommended
+jupyter>=1.0.0  # For notebook export
+nbformat>=5.9.0
