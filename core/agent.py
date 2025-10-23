@@ -143,49 +143,35 @@ Remember: Your goal is to transform data into insights that drive decisions. Nev
     
     def _prepare_data_context(self) -> str:
         """
-        Prepare concise data context using AUTO-GENERATED summaries
-        Uses summaries created during file upload for token efficiency
+        ONLY USE SUMMARIES - Never raw data
+        Uses pre-computed Top N summaries for token efficiency
         """
         context_parts = []
         
-        for table_name, df in self.data_manager.tables.items():
-            # Get metadata with auto-generated summary
+        for table_name in self.data_manager.tables.keys():
             metadata = self.data_manager.file_metadata.get(table_name, {})
-            auto_summary = metadata.get('auto_summary', {})
+            summaries = metadata.get('summaries', {})
             
-            if auto_summary:
-                # Use pre-generated summary (much faster, no recomputation)
-                summary = f"""
-**Table: {table_name}**
-- Shape: {auto_summary.get('row_count', 0):,} rows × {auto_summary.get('column_count', 0)} columns
-- Memory: {auto_summary.get('memory_mb', 0):.2f} MB
+            if not summaries:
+                context_parts.append(f"⚠️ {table_name}: No summaries")
+                continue
+            
+            # Build from summaries ONLY
+            context = f"""**Table: {table_name}**
+Rows: {summaries.get('row_count', 0):,} | Columns: {summaries.get('column_count', 0)} | Size: {summaries.get('memory_mb', 0):.1f}MB
 
-**Column Summary (Top 5):**"""
-                
-                # Add top 5 columns with their stats
-                columns_info = auto_summary.get('columns', {})
-                for i, (col, stats) in enumerate(list(columns_info.items())[:5]):
-                    summary += f"\n  {i+1}. {col} ({stats['dtype']})"
-                    if 'mean' in stats:
-                        summary += f" - Mean: {stats['mean']:.2f}, Range: [{stats['min']:.2f}, {stats['max']:.2f}]"
-                    elif 'unique' in stats:
-                        summary += f" - {stats['unique']} unique values"
-                
-                # Add correlations if available
-                if 'correlations' in auto_summary and auto_summary['correlations']:
-                    summary += "\n\n**Key Correlations:**"
-                    for pair, corr in list(auto_summary['correlations'].items())[:3]:
-                        summary += f"\n  - {pair}: {corr:.3f}"
-            else:
-                # Fallback: basic summary only
-                summary = f"""
-**Table: {table_name}**
-- Shape: {df.height:,} rows × {df.width} columns
-- Columns: {', '.join(df.columns[:10])}"""
+**Top 10 Analysis (Categorical × Numerical):**"""
             
-            context_parts.append(summary)
+            for key, data in summaries.get('top_n_analysis', {}).items():
+                context += f"\n{key}:"
+                for item in data[:5]:
+                    context += f"\n  • {item['category']}: {item['value']:.2f}"
+            
+            context_parts.append(context)
         
-        return "\n".join(context_parts)
+        result = "\n\n".join(context_parts)
+        print(f"🔍 Data context: {len(result)} chars")
+        return result
     
     def _agentic_loop(
         self,
