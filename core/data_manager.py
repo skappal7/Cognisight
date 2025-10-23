@@ -7,6 +7,7 @@ import duckdb
 import io
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
+from datetime import datetime
 import pandas as pd
 
 
@@ -36,7 +37,14 @@ class DataManager:
         
         try:
             if file_ext == '.csv':
-                df = pl.read_csv(file)
+                # Read CSV with better error handling for mixed types
+                df = pl.read_csv(
+                    file,
+                    infer_schema_length=10000,  # Increase schema detection
+                    ignore_errors=True,  # Skip problematic rows
+                    null_values=['NA', 'N/A', 'NULL', ''],  # Common null values
+                    try_parse_dates=True  # Auto-parse dates
+                )
             elif file_ext == '.parquet':
                 df = pl.read_parquet(file)
             elif file_ext in ['.xlsx', '.xls']:
