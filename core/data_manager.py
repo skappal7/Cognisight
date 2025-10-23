@@ -24,9 +24,13 @@ class DataManager:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
     
-    def load_file(self, file) -> pl.DataFrame:
+    def load_file(self, file, top_n: int = 10) -> pl.DataFrame:
         """
         Load file, convert to Parquet, generate DuckDB summaries
+        
+        Args:
+            file: Streamlit UploadedFile object
+            top_n: Number of top records for categorical × numerical summaries
         """
         file_name = file.name if hasattr(file, 'name') else str(file)
         file_ext = Path(file_name).suffix.lower()
@@ -64,8 +68,8 @@ class DataManager:
             self.tables[table_name] = df
             self.db.register(table_name, df.to_pandas())
             
-            # Generate summaries
-            summaries = self._generate_top_n_summaries(table_name, df)
+            # Generate summaries with user-specified top_n
+            summaries = self._generate_top_n_summaries(table_name, df, top_n=top_n)
             
             # Store metadata
             self.file_metadata[table_name] = {
@@ -73,6 +77,7 @@ class DataManager:
                 'parquet_path': str(parquet_path),
                 'summaries': summaries,
                 'shape': (df.height, df.width),
+                'top_n': top_n,
                 'upload_time': datetime.now().isoformat()
             }
             
