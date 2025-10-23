@@ -37,14 +37,31 @@ class DataManager:
         
         try:
             if file_ext == '.csv':
-                # Read CSV with better error handling for mixed types
-                df = pl.read_csv(
-                    file,
-                    infer_schema_length=10000,  # Increase schema detection
-                    ignore_errors=True,  # Skip problematic rows
-                    null_values=['NA', 'N/A', 'NULL', ''],  # Common null values
-                    try_parse_dates=True  # Auto-parse dates
-                )
+                # First pass - detect problematic columns
+                try:
+                    df = pl.read_csv(
+                        file,
+                        infer_schema_length=10000,
+                        ignore_errors=False
+                    )
+                except Exception as e:
+                    # If parsing fails, read with all columns as strings first
+                    df = pl.read_csv(
+                        file,
+                        infer_schema_length=0,  # Treat all as strings
+                        ignore_errors=True
+                    )
+                    
+                    # Try to convert columns to appropriate types
+                    for col in df.columns:
+                        try:
+                            # Try to convert to numeric if possible
+                            df = df.with_columns(
+                                pl.col(col).cast(pl.Float64, strict=False).alias(col)
+                            )
+                        except:
+                            # Keep as string if conversion fails
+                            pass
             elif file_ext == '.parquet':
                 df = pl.read_parquet(file)
             elif file_ext in ['.xlsx', '.xls']:
