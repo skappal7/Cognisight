@@ -25,10 +25,11 @@ from utils.report_generator import ReportGenerator
 # Branding Configuration
 LOGO_URL = "https://raw.githubusercontent.com/skappal7/TextAnalyser/refs/heads/main/logo.png"
 FOOTER = "Developed with Streamlit with 💗 by CE Team Innovation Lab 2025"
+APP_TITLE = "COGNiNSIGHTS"
 
 # Page configuration
 st.set_page_config(
-    page_title="COGNISIGHT",
+    page_title="COGNiNSIGHTS - AI Data Analyst",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -331,22 +332,106 @@ st.markdown("""
         }
     }
     
-    /* Quick action buttons with gradient */
-    .quick-action-btn {
-        background: linear-gradient(135deg, var(--sutherland-pink) 0%, #D81B60 100%);
+    /* Action card buttons - Pink cards */
+    .action-card-pink {
+        background: linear-gradient(135deg, #E91E63 0%, #D81B60 100%);
         color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.8rem;
-        margin: 0.3rem;
+        padding: 2rem 1.5rem;
+        border-radius: 16px;
+        text-align: center;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 4px rgba(233, 30, 99, 0.2);
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+        min-height: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
     }
     
-    .quick-action-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
+    .action-card-pink:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 24px rgba(233, 30, 99, 0.4);
+    }
+    
+    /* Action card buttons - Navy cards */
+    .action-card-navy {
+        background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+        color: white;
+        padding: 2rem 1.5rem;
+        border-radius: 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3);
+        min-height: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .action-card-navy:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 24px rgba(44, 62, 80, 0.4);
+    }
+    
+    .action-card-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-top: 0.8rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .action-card-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Sidebar styling */
+    .sidebar-nav {
+        background: #F8F9FA;
+        padding: 1rem;
+        border-radius: 12px;
+        margin: 0.5rem 0;
+    }
+    
+    .sidebar-nav-item {
+        display: flex;
+        align-items: center;
+        padding: 0.8rem 1rem;
+        margin: 0.3rem 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: #666;
+        font-weight: 500;
+    }
+    
+    .sidebar-nav-item:hover {
+        background: white;
+        color: var(--sutherland-navy);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .sidebar-nav-icon {
+        margin-right: 0.8rem;
+        font-size: 1.3rem;
+    }
+    
+    /* App title styling */
+    .app-title {
+        font-size: 2rem;
+        font-weight: 900;
+        color: var(--sutherland-navy);
+        letter-spacing: 1px;
+        margin-bottom: 0;
+    }
+    
+    .app-subtitle {
+        font-size: 0.95rem;
+        color: #999;
+        margin-top: 0.3rem;
     }
     
     /* Footer styling */
@@ -430,13 +515,33 @@ def init_session_state():
         st.session_state.analysis_results = []
 
 def sidebar_config():
-    """Configure sidebar with LLM settings and file upload"""
+    """Configure sidebar with navigation and settings"""
+    
+    # Sidebar Navigation
+    st.sidebar.markdown("### Navigation")
+    
+    nav_items = [
+        ("⚙️", "SETTINGS", "settings"),
+        ("☁️", "UPLOAD DATA", "upload"),
+        ("💰", "USAGE", "usage"),
+        ("🗄️", "CACHE MANAGEMENT", "cache"),
+        ("💾", "SAVE SESSION", "save"),
+        ("⬇️", "DOWNLOAD SESSION", "download")
+    ]
+    
+    for icon, label, key in nav_items:
+        if st.sidebar.button(f"{icon}  {label}", key=f"nav_{key}", use_container_width=True):
+            st.session_state.current_view = key
+    
+    st.sidebar.markdown("---")
+    
+    # LLM Configuration (Settings)
     st.sidebar.markdown("### 🤖 LLM Configuration")
     
     # LLM Provider Selection
     llm_provider = st.sidebar.selectbox(
         "Select LLM Provider",
-        ["OpenRouter (Cloud)", "Ollama (Local)", "LM Studio (Local)"],
+        ["OpenRouter (Free)", "Ollama (Local)", "LM Studio (Local)"],
         key="llm_provider"
     )
     
@@ -785,19 +890,17 @@ def main():
     """Main application"""
     init_session_state()
     
-    # Display Logo
-    st.markdown(f"""
-        <div class="logo-container">
-            <img src="{LOGO_URL}" alt="Sutherland Logo">
-        </div>
-    """, unsafe_allow_html=True)
+    # Top bar with logo and title
+    col1, col2, col3 = st.columns([1, 6, 1])
     
-    # Header
-    st.markdown('<h1 class="main-header">📊 COGNISIGHT</h1>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="sub-header">Your intelligent assistant for comprehensive data analysis and visualization</p>',
-        unsafe_allow_html=True
-    )
+    with col1:
+        st.markdown(f'<div class="app-title">{APP_TITLE}</div>', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('<p class="app-subtitle">Your intelligent assistant for comprehensive data analysis and visualization</p>', unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f'<img src="{LOGO_URL}" width="120">', unsafe_allow_html=True)
     
     # Sidebar
     sidebar_config()
@@ -829,28 +932,43 @@ def main():
         process_user_input(user_input)
         st.rerun()
     
-    # Quick action buttons
-    st.markdown("#### 🚀 Quick Actions")
-    col1, col2, col3, col4 = st.columns(4)
+    # Action Cards (matching the image design)
+    st.markdown("---")
+    
+    # Row 1 - Pink cards
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📊 Data Overview", use_container_width=True):
+        if st.button("📊\n\nDATA OVERVIEW", key="card_overview", use_container_width=True):
             process_user_input("Provide a comprehensive overview of all uploaded datasets")
             st.rerun()
     
     with col2:
-        if st.button("📈 Trend Analysis", use_container_width=True):
+        if st.button("📈\n\nTREND ANALYSIS", key="card_trends", use_container_width=True):
             process_user_input("Identify and visualize key trends in the data")
             st.rerun()
     
     with col3:
-        if st.button("🔍 Anomaly Detection", use_container_width=True):
+        if st.button("🔍\n\nANOMALY DETECTION", key="card_anomaly", use_container_width=True):
             process_user_input("Detect and explain any anomalies or outliers in the data")
             st.rerun()
     
+    # Row 2 - Navy cards
+    col4, col5, col6 = st.columns(3)
+    
     with col4:
-        if st.button("💡 Insights", use_container_width=True):
+        if st.button("💡\n\nINSIGHTS", key="card_insights", use_container_width=True):
             process_user_input("Generate key insights and recommendations based on the data")
+            st.rerun()
+    
+    with col5:
+        if st.button("📊\n\nSTATISTICAL ANALYSIS", key="card_stats", use_container_width=True):
+            process_user_input("Perform detailed statistical analysis on the data")
+            st.rerun()
+    
+    with col6:
+        if st.button("💻\n\nCODING", key="card_coding", use_container_width=True):
+            process_user_input("Generate Python code for data analysis and visualization")
             st.rerun()
     
     # PDF Report Download
